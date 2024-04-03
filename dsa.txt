@@ -1,0 +1,84 @@
+from hashlib import sha1
+from random import randint
+from sympy import mod_inverse, isprime, primerange
+
+def hash_function(message):
+    hashed = sha1(message.encode("UTF-8")).hexdigest()
+    return hashed
+
+def getPrime(bits):
+    primes = list(primerange(2**(bits-1), 2**bits))
+    return primes[randint(0, len(primes)-1)]
+def parameter_generation():
+    q = getPrime(5)
+    p = getPrime(10)
+    while (p-1) % q != 0:
+        p = getPrime(10)
+        q = getPrime(5)
+    print("Prime divisor (q): ", q)
+    print("Prime modulus (p): ", p)
+    flag = True
+    while flag:
+        h = int(input("Enter integer between 1 and p-1 (h): "))
+        if 1 < h < (p-1):
+            g = pow(h, int((p-1)/q), p)
+            flag = False
+        else:
+            print("Wrong entry")
+    print("Value of g is : ", g)
+    return p, q, g
+
+def per_user_key(p, q, g):
+    x = randint(1, q-1)
+    print("Randomly chosen x (Private key) is: ", x)
+    y = pow(g, x, p)
+    print("Randomly chosen y (Public key) is: ", y)
+    return x, y
+
+def signature(name, p, q, g, x):
+    with open(name) as file:
+        text = file.read()
+    hash_component = hash_function(text)
+    print("Hash of the document sent is: ", hash_component)
+    r = 0
+    s = 0
+    while s == 0 or r == 0:
+        k = randint(1, q-1)
+        r = pow(g, k, p) % q
+        i = mod_inverse(k, q)
+        hashed = int(hash_component, 16)
+        s = (i * (hashed + (x * r))) % q
+    return r, s
+
+def verification(name, p, q, g, r, s, y):
+    with open(name) as file:
+        text = file.read()
+    hash_component = hash_function(text)
+    print("Hash of the document received is: ", hash_component)
+    w = mod_inverse(s, q)
+    print("Value of w is: ", w)
+    hashed = int(hash_component, 16)
+    u1 = (hashed * w) % q
+    u2 = (r * w) % q
+    v = ((pow(g, u1, p) * pow(y, u2, p)) % p) % q
+    print("Value of u1 is: ", u1)
+    print("Value of u2 is: ", u2)
+    print("Value of v is: ", v)
+    if v == r:
+        print("The signature is valid!")
+    else:
+        print("The signature is invalid!")
+
+from google.colab import drive
+drive.mount('/content/drive/')
+%cd /content/drive/My Drive/Colab Notebooks/
+p, q, g = parameter_generation()
+x, y = per_user_key(p, q, g)
+print()
+file_name = input("Enter the name of the document to sign: ")
+r, s = signature(file_name, p, q, g, x)
+print("r (Component of signature) is: ", r)
+print("s (Component of signature) is: ", s)
+print()
+file_name = input("Enter the name of the document to verify: ")
+verification(file_name, p, q, g, r, s, y)
